@@ -171,7 +171,106 @@ fit_alt = lm(price ~ stars + borough, data = nyc_airbnb)
 anova(fit_null, fit_alt) #compares the two models
 ```
 
+## Nesting data 
 
+try a more complicated model 
+
+```{r}
+nyc_airbnb |> 
+  lm(price ~ stars * borough + room_type * borough, data = _) |>  #do stars and borough have an interaction? does the effect of stars differ depending on which borough you are in? 
+  broom::tidy() |> 
+  knitr::kable(digits = 3)
+```
+
+stars : main effect of stars in reference category (bronx) 
+
+What if I want to know what's happening in Manhattan?
+```{r}
+ nyc_airbnb |> 
+  filter(borough == "Manhattan") |> 
+  lm(price ~ stars + room_type, data = _) |> 
+  broom::tidy()
+
+ nyc_airbnb |> 
+  filter(borough == "Bronx") |> 
+  lm(price ~ stars + room_type, data = _) |> 
+  broom::tidy()
+```
+Now we're back to iteration - I want to fit same model over and over 
+
+Create a quick function
+```{r}
+airbnb_lm = function(data) {
+  
+  lm(price ~ stars + room_type, data = data)
+  
+}
+```
+
+fit that function to each column we care about 
+```{r}
+nyc_airbnb |> 
+  nest(datasets = -borough) |>  #nesting everything except borough - dfs that go with each borough in df
+  mutate(
+    fits = map(datasets, airbnb_lm), 
+    results = map(fits, broom::tidy) #tidying up results of column you just created (lm fits)
+  ) |> 
+  pull(results)
+```
+
+```{r}
+nyc_airbnb |> 
+  nest(datasets = -borough) |>  #nesting everything except borough - dfs that go with each borough in df
+  mutate(
+    fits = map(datasets, airbnb_lm), 
+    results = map(fits, broom::tidy) #tidying up results of column you just created (lm fits)
+  ) |> 
+  select(-datasets, -fits) |> 
+  unnest(results) |> #fancy it up!
+  select(borough, term, estimate) |> 
+  pivot_wider(
+    names_from = term, 
+    values_from = estimate
+  )
+```
+Effect of stars is strongest in Manhattan and weakest in the Bronx. this does not answer "does stars matter in a stat sig way?" need to make alt model and do an F test for that. this is good for EDA though 
+
+Creating anonymous function
+```{r}
+nyc_airbnb |> 
+  nest(datasets = -borough) |>  #nesting everything except borough - dfs that go with each borough in df
+  mutate(
+    fits = map(datasets, \(data) lm(price ~ stars + room_type, data = data)), #shorthand for creating same function, get same results as above
+    results = map(fits, broom::tidy) #tidying up results of column you just created (lm fits)
+  ) |> 
+  select(-datasets, -fits) |> 
+  unnest(results) |> #fancy it up!
+  select(borough, term, estimate) |> 
+  pivot_wider(
+    names_from = term, 
+    values_from = estimate
+  )
+```
+
+
+```{r}
+nyc_airbnb |> 
+  filter(borough == "Manhattan") |> 
+  nest(datasets = -neighborhood) |> 
+  mutate( 
+    fits = map(datasets, \(df) lm(price ~ stars + room_type, data = df)), 
+    results = map(fits, broom::tidy)
+    ) |> 
+  select(neighborhood, results) |> 
+  unnest(results) |> 
+  filter(term == "room_typePrivate room") |> 
+  ggplot(aes(x = neighborhood, y = estimate)) + 
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
+The entire home/apartment will be much more expensive in some of these neighborhoods (-100 means you will save $100) 
+
+## Logistic regression 
 
 
 
