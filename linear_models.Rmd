@@ -1,0 +1,125 @@
+---
+title: "linear_models"
+author: "Emma"
+date: "2026-11-12"
+output: github_document
+---
+
+# Linear Regression 
+
+Linear regression is one approach to modeling. It covers simple stuff (t tests) to complex stuff (automated variable selection via penalization) 
+
+* observe data for subjects 1 to n. Want to estimate Beta... in the model 
+
+* assumptions, residuals have mean zero, constant variance, and are independent 
+
+* estimate parameters using OLS 
+
+Predictors 
+Outcome is continuous, predictors can be anything
+categorical predictors require indicator variables (for each non-reference group, a binary variable indicating group membership for each subject is created and used in the model) 
+
+Testing 
+For a single regression coefficient, you can construct a test statistic 
+
+For large samples this has a standard normal distribution 
+
+Diagnostics 
+Many model assumptions can be examinded using residuals 
+
+* look at overall distribution 
+* look at residuals vs predictors 
+
+Generalized linear models 
+* appropriate for non-continuous
+
+Linear models in R 
+`lm` for linear models 
+`glm` for generalized linear models 
+
+output is complex, use `broom` package to clean up 
+
+```{r}
+library(tidyverse)
+library(p8105.datasets)
+
+set.seed(1)
+```
+
+```{r}
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+## Airbnb 
+
+```{r}
+data("nyc_airbnb")
+```
+
+```{r}
+nyc_airbnb = 
+  nyc_airbnb |> 
+  mutate(
+    stars = review_scores_location / 2
+  ) |> 
+  rename(
+    borough = neighbourhood_group, 
+    neighborhood = neighbourhood 
+  ) |> 
+  filter(
+    borough != "Staten Island"
+  ) |> 
+  select(price, stars, borough, neighborhood, room_type)
+```
+
+Fit a linear regression 
+
+```{r}
+fit = lm(price ~ stars + borough, data = nyc_airbnb)
+```
+
+Look at what we have 
+
+```{r}
+summary(fit)
+coef(fit)
+fitted.values(fit) #all 40,000 fitted values 
+resid(fit) #computes all residuals 
+names(fit) # what are names of stuff in fit? 
+```
+
+most of this output is bad, but sometimes it is okay 
+
+let's do better. tidy it with broom!  
+
+```{r}
+broom::tidy(fit) |> #pulls out stuff you probably care about, formats it as df, works on almost everything 
+  select(-std.error) |> 
+  knitr::kable(digits = 3)
+
+broom::glance(fit) #quick information that is potentially relevant 
+```
+
+
+
+
+
+
+
+
+
+
