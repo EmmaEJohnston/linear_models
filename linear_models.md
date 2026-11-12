@@ -101,7 +101,7 @@ nyc_airbnb =
 Fit a linear regression
 
 ``` r
-fit = lm(price ~ stars + borough, data = nyc_airbnb)
+fit = lm(price ~ stars + borough, data = nyc_airbnb) #borough is indicator variable, bronx is reference category because it is first alphabetically 
 ```
 
 Look at what we have
@@ -21124,3 +21124,28 @@ broom::glance(fit) #quick information that is potentially relevant
     ##       <dbl>         <dbl> <dbl>     <dbl>     <dbl> <dbl>    <dbl>  <dbl>  <dbl>
     ## 1    0.0342        0.0341  182.      271. 6.73e-229     4 -202113. 4.04e5 4.04e5
     ## # ℹ 3 more variables: deviance <dbl>, df.residual <int>, nobs <int>
+
+Change reference category
+
+``` r
+fit = 
+  nyc_airbnb |> 
+  mutate(
+    borough = fct_infreq(borough)
+  ) |> 
+  lm(price ~ stars + borough, data = _)
+
+
+broom::tidy(fit) |> 
+  select(-std.error, -statistic) |> 
+  mutate(term = str_replace(term, "borough", "Borough: ")) |> # just constructing term variables in a nicer way to look at 
+  knitr::kable(digits = 3)
+```
+
+| term              | estimate | p.value |
+|:------------------|---------:|--------:|
+| (Intercept)       |   19.839 |   0.104 |
+| stars             |   31.990 |   0.000 |
+| Borough: Brooklyn |  -49.754 |   0.000 |
+| Borough: Queens   |  -77.048 |   0.000 |
+| Borough: Bronx    |  -90.254 |   0.000 |

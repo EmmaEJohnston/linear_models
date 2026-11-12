@@ -89,7 +89,7 @@ nyc_airbnb =
 Fit a linear regression 
 
 ```{r}
-fit = lm(price ~ stars + borough, data = nyc_airbnb)
+fit = lm(price ~ stars + borough, data = nyc_airbnb) #borough is indicator variable, bronx is reference category because it is first alphabetically 
 ```
 
 Look at what we have 
@@ -114,6 +114,22 @@ broom::tidy(fit) |> #pulls out stuff you probably care about, formats it as df, 
 broom::glance(fit) #quick information that is potentially relevant 
 ```
 
+Change reference category 
+
+```{r}
+fit = 
+  nyc_airbnb |> 
+  mutate(
+    borough = fct_infreq(borough)
+  ) |> 
+  lm(price ~ stars + borough, data = _)
+
+
+broom::tidy(fit) |> 
+  select(-std.error, -statistic) |> 
+  mutate(term = str_replace(term, "borough", "Borough: ")) |> # just constructing term variables in a nicer way to look at 
+  knitr::kable(digits = 3)
+```
 
 
 
