@@ -346,3 +346,115 @@ cv_df |>
 
 <img src="cross_validation_files/figure-gfm/unnamed-chunk-20-1.png" alt="" width="90%" />
 Shows that smooth usually works better, and there is less variance
+
+## Another example: Child growth
+
+``` r
+growth_df = 
+  read_csv("data/nepalese_children.csv") |> 
+  mutate(
+    weight_cp7 = (weight > 7) * (weight - 7) #this is for the piecewise function, build in change point
+  )
+```
+
+    ## Rows: 2705 Columns: 5
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (5): age, sex, weight, height, armc
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+growth_df |> 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = 0.5)
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-22-1.png" alt="" width="90%" />
+We will look at weight as a predictor of arm circumference. Tails look
+kind of weird in this plot, we probably can’t just use a linear model
+
+``` r
+linear_fit = lm(armc ~ weight, data = growth_df)
+
+smooth_fit = gam(armc ~ s(weight), data = growth_df)
+
+pwl_fit = lm(armc ~ weight + weight_cp7, data = growth_df)
+```
+
+``` r
+growth_df |> 
+  add_predictions(linear_fit) |> 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = pred), color = 'red')
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-24-1.png" alt="" width="90%" />
+
+``` r
+growth_df |> 
+  add_predictions(smooth_fit) |> 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = pred), color = 'red')
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-25-1.png" alt="" width="90%" />
+
+``` r
+growth_df |> 
+  add_predictions(pwl_fit) |> 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = 0.5) +
+  geom_line(aes(y = pred), color = 'red')
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-26-1.png" alt="" width="90%" />
+
+``` r
+cv_df = 
+  crossv_mc(growth_df, 100) |> 
+  mutate(
+    train = map(train, as_tibble), 
+    test = map(test, as_tibble)
+  )
+```
+
+``` r
+cv_df =
+  cv_df |> 
+  mutate(
+    linear_fit = map(train, \(df) lm(armc ~ weight, data = df)),
+    smooth_fit = map(train, \(df) gam(armc ~ s(weight), data = df)), 
+    pwl_fit = map(train, \(df) lm(armc ~ weight + weight_cp7, data = df))
+  ) |> 
+  mutate(
+    rmse_linear = map2_dbl(linear_fit, test, rmse), 
+    rmse_smooth = map2_dbl(smooth_fit, test, rmse), 
+    rmse_pwl = map2_dbl(pwl_fit, test, rmse)
+  )
+```
+
+``` r
+cv_df |> 
+  select(starts_with("rmse_")) |> 
+  pivot_longer(
+    everything(), 
+    names_to = "model",
+    names_prefix = "rmse_", 
+    values_to = "rmse"
+  ) |> 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_violin()
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-29-1.png" alt="" width="90%" />
+This is the distribution of rmses across models.
+
+- Thing that is nice about PWL is that it is super easy to interpret -
+  two linear interpretations. strict change point is not biologically
+  plausible (we also chose where it was, just by eyeballing)
+
+- smooth fit looks like best prediction accuracy - but hard to interpret
