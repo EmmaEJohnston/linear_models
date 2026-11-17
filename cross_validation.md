@@ -1,0 +1,104 @@
+cross_validation
+================
+Emma
+2026-11-17
+
+## Model selection
+
+when you have lots of possible variables, you have to choose which will
+go in your model
+
+remember, no model is “true”
+
+In nested models, you have tests
+
+- you have to be worried about multiple comparisons and “fishing”
+
+In non-nested models, you don’t have tests
+
+- balance goodness of fit with “complexity”
+
+Is your model too complex? Not complex enough? Am I underfiting or
+overfitting? Do I have high bias or high variance? Will my model
+generalize to future datasets?
+
+## Cross validation
+
+Ideally, you’d build your model based off a data set and then collect
+more data from same population to test that the model works. That
+doesn’t usually happen, so instead:
+
+randomly split your data into “training” and “testing”
+
+- “training” data used to build your model
+- “testing” data used to evaluate out of sample fit
+- exact ratio depends, but 80/20 is a good bet
+
+Evaluate using root mean squared error in the testing dataset –\> low
+RMSE is indicative of good prediction accuracy (because predicted value
+is close to observed value, so low number)
+
+Can use to compare candidate models that are all “traditional”
+
+Comes up a lot in “modern” methods - often built in so you don’t even
+see it
+
+## Refinements and variations
+
+Usually repeat the training/testing split using iteration –\> indicates
+whether differences in models are consistent across splits
+
+Folding partitions data into equally sized subsets
+
+- one fold used as testing, remaining folds as training
+- repeated for each fold as testing
+
+Jeff doesn’t do that as often
+
+## Prediction as a goal
+
+Prediction accuracy matters as well as statistical significance
+(different goal)
+
+- Good models make good predictions that adequately describe the data
+  generating mechanism
+- you lose the p values though
+
+Use `modelr` package. functions: `add_predictions()`, `add_residuals()`,
+`rmse()`, `crossv_mc()`
+
+``` r
+library(tidyverse)
+```
+
+    ## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+    ## ✔ dplyr     1.2.1     ✔ readr     2.2.0
+    ## ✔ forcats   1.0.1     ✔ stringr   1.6.0
+    ## ✔ ggplot2   4.0.3     ✔ tibble    3.3.1
+    ## ✔ lubridate 1.9.5     ✔ tidyr     1.3.2
+    ## ✔ purrr     1.2.2     
+    ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+    ## ✖ dplyr::filter() masks stats::filter()
+    ## ✖ dplyr::lag()    masks stats::lag()
+    ## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+
+``` r
+library(modelr)
+library(mgcv)
+```
+
+    ## Loading required package: nlme
+    ## 
+    ## Attaching package: 'nlme'
+    ## 
+    ## The following object is masked from 'package:dplyr':
+    ## 
+    ##     collapse
+    ## 
+    ## This is mgcv 1.9-4. For overview type '?mgcv'.
+
+``` r
+library(p8105.datasets)
+
+set.seed(1)
+```
