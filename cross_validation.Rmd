@@ -180,6 +180,88 @@ rmse(smooth_mod, test_df) #much lower prediction error - the best model
 rmse(wiggly_mod, test_df)
 ```
 
+# CV using `modelr` 
+
+AKA repeat the above a bunch of times 
+
+```{r}
+cv_df = 
+  crossv_mc(lidar_df, 100) #plug in df, repeat 100 times. automatically makes training and testing datasets (in 80/20 split), repeats that 100 times. stores all the data in list columns 
+
+cv_df |> 
+  pull(train) |> 
+  nth(2) |>  #confirm that there is a different 80/20 split every time 
+  as_tibble() #can convert to a df anytime 
+```
+
+```{r}
+cv_df = 
+  crossv_mc(lidar_df, 100) |> 
+  mutate(
+    train = map(train, as_tibble), 
+    test = map(test, as_tibble)
+  )
+```
+
+Let's fit models and get rmses for these 
+
+```{r}
+rmse_comp = function(model, dataset){
+  
+  rmse(model, dataset)
+  
+}
+```
+
+```{r}
+cv_df = #apply linear mod to every training dataset, and get rmse for every testing dataset
+  cv_df |> 
+  mutate(
+    linear_fit = map(train, \(df) lm(logratio ~ range, data = df)) #anonymous function - get training df, call it df, fit this linear model to it 
+  ) |> 
+  mutate(
+    rmse_linear = map2(linear_fit, test, rmse_comp) #map across two things (linear model across testing dataset, get rmse)
+  )
+  
+```
+
+Could also skip function and just use rmse to simplify it 
+```{r}
+cv_df =
+  cv_df |> 
+  mutate(
+    linear_fit = map(train, \(df) lm(logratio ~ range, data = df)),
+    smooth_fit = map(train, \(df) gam(logratio ~ s(range), data = df)), 
+    wiggly_fit = map(train, \(df) gam(logratio ~ s(range, k = 30), sp = 10e-6, data = df))
+  ) |> 
+  mutate(
+    rmse_linear = map2_dbl(linear_fit, test, rmse), 
+    rmse_smooth = map2_dbl(smooth_fit, test, rmse), 
+    rmse_wiggly = map2_dbl(wiggly_fit, test, rmse)
+  )
+```
+
+```{r}
+cv_df |> 
+  ggplot(aes(x = rmse_linear)) +
+  geom_density()
+```
+
+Do some data tidying
+```{r}
+cv_df |> 
+  select(starts_with("rmse_")) |> 
+  pivot_longer(
+    everything(), 
+    names_to = "model",
+    names_prefix = "rmse_", 
+    values_to = "rmse"
+  ) |> 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_violin()
+```
+Shows that smooth usually works better, and there is less variance 
+
 
 
 
