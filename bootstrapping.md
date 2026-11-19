@@ -220,3 +220,130 @@ boot_strap_df_constant =
 
 This gives you the same assumptions as the OG dataset (which is good
 because we trust those assumptions!) - it will give you the right answer
+
+## Airbnb
+
+``` r
+data("nyc_airbnb")
+
+nyc_airbnb = 
+  nyc_airbnb |> 
+  mutate(
+    stars = review_scores_location / 2
+  ) |> 
+  rename(
+    borough = neighbourhood_group, 
+    neighborhood = neighbourhood
+  ) |> 
+  filter(borough != "Staten Island") |> 
+  drop_na(price, stars) |> 
+  select(price, stars, borough, neighborhood, room_type)
+```
+
+this doesn’t look good:
+
+``` r
+nyc_airbnb |> 
+  ggplot(aes(x = stars, y = price, color = room_type)) +
+  geom_point()
+```
+
+![](bootstrapping_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+Skewed data, if we fit a linear regression model to this, I dont know if
+I’d trust it
+
+Bootstrap
+
+``` r
+airbnb_bootstrap_df = 
+  nyc_airbnb |> 
+  filter(borough == "Manhattan") |> 
+  modelr::bootstrap(n = 1000) |> 
+  mutate( #jumping to results 
+    model_fits = map(strap, \(df) lm (price ~ stars + room_type, data = df)), 
+    results = map(model_fits, broom::tidy)
+  )
+```
+
+are these coefficients close enough to normal that I can trust default
+inference?
+
+``` r
+airbnb_bootstrap_df |> 
+  select(results) |> 
+  unnest(results)
+```
+
+    ## # A tibble: 4,000 × 5
+    ##    term                  estimate std.error statistic   p.value
+    ##    <chr>                    <dbl>     <dbl>     <dbl>     <dbl>
+    ##  1 (Intercept)              127.      25.1       5.05 4.48e-  7
+    ##  2 stars                     20.2      5.18      3.90 9.83e-  5
+    ##  3 room_typePrivate room   -117.       3.92    -29.8  6.07e-189
+    ##  4 room_typeShared room    -149.      11.6     -12.9  8.89e- 38
+    ##  5 (Intercept)               91.9     23.3       3.95 7.84e-  5
+    ##  6 stars                     28.6      4.81      5.94 2.84e-  9
+    ##  7 room_typePrivate room   -128.       3.58    -35.7  8.00e-268
+    ##  8 room_typeShared room    -156.      10.1     -15.4  4.52e- 53
+    ##  9 (Intercept)               63.3     17.8       3.55 3.86e-  4
+    ## 10 stars                     33.8      3.68      9.18 5.02e- 20
+    ## # ℹ 3,990 more rows
+
+``` r
+airbnb_bootstrap_df |> 
+  select(results) |> 
+  unnest(results) |> 
+  filter(term == "stars") |> 
+  ggplot(aes(x = estimate)) + 
+  geom_density()
+```
+
+![](bootstrapping_files/figure-gfm/unnamed-chunk-18-1.png)<!-- --> Does
+not look super symmetric
+
+CI for stars slope:
+
+``` r
+airbnb_bootstrap_df |> 
+  select(results) |> 
+  unnest(results) |> 
+  filter(term == "stars") |> 
+  summarize(
+    slope_estimate = mean(estimate), 
+    ci_lb = quantile(estimate, 0.025),
+    ci_ub = quantile(estimate, 0.975)
+  )
+```
+
+    ## # A tibble: 1 × 3
+    ##   slope_estimate ci_lb ci_ub
+    ##            <dbl> <dbl> <dbl>
+    ## 1           27.2  14.0  38.1
+
+# LIDAR
+
+``` r
+data("lidar")
+
+lidar |> 
+  ggplot(aes(x = range, y = logratio)) + 
+  geom_point() + 
+    stat_smooth(method = "gam", formula = y ~ s(x))
+```
+
+![](bootstrapping_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+
+``` r
+lidar |> 
+  modelr::bootstrap(n = 250) |> 
+  mutate(
+    models = map(strap, \(df) gam(logratio ~ s(range), data = df)),
+    results = map(models, \(mod) modelr::add_predictions(data = lidar, model = mod))) |> 
+  select(.id, results) |> 
+  unnest(results) |> 
+  ggplot(aes(x = range, y = pred, group = .id)) + 
+  geom_path(color = "blue", alpha = .5) + 
+  geom_point(data = lidar, aes(y = logratio, group = NULL))
+```
+
+![](bootstrapping_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
